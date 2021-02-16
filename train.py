@@ -1,8 +1,8 @@
 import os
 import data
-from model import unet_model_2d
-import generator
-from training import train_model, load_old_model
+# from model import unet_model_2d
+# import generator
+# from training import train_model, load_old_model
 import argparse
 
 config = dict()
@@ -34,13 +34,16 @@ config["validation_file"] = os.path.abspath("validation_ids.pkl")
 config["overwrite"] = False  # If True, will previous files. If False, will use previously written files.
 config["train_repo"] = "data/augmented/train"
 config["truthData"] = "data/original/labels.pkl"
+config["training_repo"] = "data/original"
 
 def main(overwrite=False, training_repo="data/original", logging_file="training.log"):
     
     # convert input images into an hdf5 file
-    if not os.path.exists(config["data_file"]):
+    if not os.path.exists(config["data_file"]) or True:
         print("Writing the images to h5 file...")
         training_files, subject_ids = data.fetch_training_data_files(training_repo)
+        print("subject ids:")
+        print(subject_ids)
         truthData = data.getTruthData(subject_ids, config["truthData"])
         print(training_files[:2])
         data.write_data_to_file(training_files, config["data_file"], image_shape=config["image_shape"], subject_ids=subject_ids, truthData=truthData)
@@ -93,15 +96,14 @@ def main(overwrite=False, training_repo="data/original", logging_file="training.
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("image_shape", help="final image shape")
-    parser.add_argument("data_file", help="absolute path to the h5 date file")
-    parser.add_argument("model_file", help="absolute path to the model file")
-    parser.add_argument("training_keys_file", help="absolute path to the training keys")
-    parser.add_argument("validation_keys_file", help="absolute path to the validation keys")
-    parser.add_argument("logging_file", help="absolute path to the logging file")
+    parser.add_argument("--image_shape", help="final image shape", default="[50,100]")
+    parser.add_argument("--data_file", help="absolute path to the h5 date file", default="ts_data.pkl")
+    parser.add_argument("--model_file", help="absolute path to the model file", default="model.pkl")
+    parser.add_argument("--training_keys_file", help="absolute path to the training keys", default="train_key_files.pkl")
+    parser.add_argument("--validation_keys_file", help="absolute path to the validation keys", default="valid_key_files.pkl")
+    parser.add_argument("--logging_file", help="absolute path to the logging file", default="log.txt")
 
     args = parser.parse_args()
-    config["training_repo"]  = "dummy"
     config["data_file"] = args.data_file
     config["model_file"] = args.model_file
     config["training_file"] = args.training_keys_file

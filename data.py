@@ -5,6 +5,7 @@ import tables
 #from monai.transforms import Affine, Rand3DElasticd, RandAffine, LoadNifti, Orientationd, Spacingd, LoadNiftid, AddChanneld, ScaleIntensityRanged, Resize
 import pickle
 from tqdm import tqdm
+import numpy as np
 #from copyData import electrodes
 
 electrodes = ['FP1','FPZ','FP2','AF3','AF4','F7','F5','F3','F1','FZ','F2','F4','F6','F8','FT7','FC5','FC3','FC1','FCZ','FC2','FC4','FC6','FT8','T7','C5','C3','C1','CZ','C2','C4','C6','T8','TP7','CP5','CP3','CP1','CPZ','CP2','CP4','CP6','TP8','P7','P5','P3','P1','PZ','P2','P4','P6','P8','PO7','PO5','PO3','POZ','PO4','PO6','PO8','O1','OZ','O2']
@@ -20,8 +21,9 @@ def fetch_training_data_files(path="data/original/"):
         subject_ids.append(os.path.basename(subject_dir))
         subject_files = list()
         for modality in electrodes:
-            subject_files.append(os.path.join(subject_dir, modality + modality + ".npy"))
+            subject_files.append(os.path.join(subject_dir, modality+ ".npy"))
         training_data_files.append(tuple(subject_files))
+    print(training_data_files)
     return training_data_files, subject_ids
 
 def getTruthData(subject_ids, labelPath):
@@ -40,7 +42,7 @@ def getTruthData(subject_ids, labelPath):
 
 def write_data_to_file(training_data_files, out_file, image_shape, subject_ids, truthData, normalize=True):
     n_samples = len(training_data_files)
-    n_channels = 1
+    n_channels = 60
 
     try:
         hdf5_file, data_storage  = create_data_file(out_file,
@@ -56,6 +58,7 @@ def write_data_to_file(training_data_files, out_file, image_shape, subject_ids, 
         raise e
 
     write_image_data_to_file(training_data_files, data_storage, image_shape)
+    print (hdf5_file)
     #if normalize:
     #    normalize_data_storage(data_storage)
     hdf5_file.close()
@@ -73,8 +76,14 @@ def create_data_file(out_file, n_channels, n_samples, image_shape, subject_ids, 
     #                                        filters=filters, expectedrows=n_samples)
     #                                         filters=filters, expectedrows=n_samples)
     #                                                 filters=filters, expectedrows=n_samples)
+    print("to be added")
+    print(subject_ids)
+    print(truthData)
     hdf5_file.create_array(hdf5_file.root, 'subject_ids', obj=subject_ids)
     hdf5_file.create_array(hdf5_file.root, 'truth', obj=truthData)
+    print("created file:")
+    print(hdf5_file)
+
     return hdf5_file, data_storage
 
 
@@ -82,13 +91,14 @@ def create_data_file(out_file, n_channels, n_samples, image_shape, subject_ids, 
 def write_image_data_to_file(image_files, data_storage, image_shape):
     for set_of_files in tqdm(image_files):
         images = load_files(set_of_files)
-        subject_data = [image.get_data() for image in images]
+        # subject_data = [image.get_data() for image in images]
+        subject_data = images
         add_data_to_storage(data_storage, subject_data)
     return data_storage
 
 
 def add_data_to_storage(data_storage, subject_data):
-    data_storage.append(np.asarray(subject_data[:n_channels])[np.newaxis])
+    data_storage.append(np.asarray(subject_data[:])[np.newaxis])
 
 
 def load_files(in_files):
