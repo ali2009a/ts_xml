@@ -43,7 +43,7 @@ models=["TCN","LSTM"]
 
 def main(args):
 	# Creating Datasets
-	# createDatasets(args,DatasetsTypes[:1],ImpTimeSteps,ImpFeatures,StartImpTimeSteps,StartImpFeatures,Loc1,Loc2,FreezeType,isMoving,isPositional,DataGenerationTypes[:1])
+	#createDatasets(args,DatasetsTypes[:1],ImpTimeSteps,ImpFeatures,StartImpTimeSteps,StartImpFeatures,Loc1,Loc2,FreezeType,isMoving,isPositional,DataGenerationTypes[:1])
 
 	# #Train Models
 	train_models(args,DatasetsTypes[:1],DataGenerationTypes[:1],models,device)
