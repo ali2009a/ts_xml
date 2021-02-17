@@ -45,7 +45,7 @@ class HDF5Dataset(Dataset):
         # x, y = self.data_handler.root.data[index], np.array([self.data_handler.root.truth[index]])
         x, y = self.data_handler.root.data[index], self.data_handler.root.truth[index]
         return (
-                x,
+                x.reshape(3000, 100),
                 y,
         )
 

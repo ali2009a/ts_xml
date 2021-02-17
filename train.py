@@ -46,6 +46,9 @@ def main(overwrite=False, training_repo="data/original", logging_file="training.
         truthData = data.getTruthData(subject_ids, config["truthData"])
         print(training_files[:2])
         data.write_data_to_file(training_files, config["data_file"], image_shape=config["image_shape"], subject_ids=subject_ids, truthData=truthData)
+
+
+
 #    data_file_opened = data.open_data_file(config["data_file"])
 #    
 #    print("Creating/loading the model")
