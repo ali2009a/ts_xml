@@ -7,8 +7,54 @@ import pickle
 from tqdm import tqdm
 import numpy as np
 #from copyData import electrodes
+from torch.utils.data import Dataset, DataLoader
+import torch.utils.data as torch_data
+import torch
 
 electrodes = ['FP1','FPZ','FP2','AF3','AF4','F7','F5','F3','F1','FZ','F2','F4','F6','F8','FT7','FC5','FC3','FC1','FCZ','FC2','FC4','FC6','FT8','T7','C5','C3','C1','CZ','C2','C4','C6','T8','TP7','CP5','CP3','CP1','CPZ','CP2','CP4','CP6','TP8','P7','P5','P3','P1','PZ','P2','P4','P6','P8','PO7','PO5','PO3','POZ','PO4','PO6','PO8','O1','OZ','O2']
+
+
+def generator(h5_path, batch_size, validation_split):
+    dataset = HDF5Dataset(h5_path)
+    dataloader = DataLoader(dataset, batch_size=2,shuffle=False, num_workers=0) 
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    split = int(np.floor(validation_split * dataset_size))
+    train_indices, val_indices = indices[split:], indices[:split]
+    print (train_indices)
+    print(val_indices)
+    train_sampler = torch_data.SubsetRandomSampler(train_indices)
+    valid_sampler = torch_data.SubsetRandomSampler(val_indices)
+    print(len(train_sampler))
+    print(len(valid_sampler))
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, 
+                                               sampler=train_sampler)
+    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+                                                    sampler=valid_sampler)
+    return train_loader, validation_loader
+
+
+class HDF5Dataset(Dataset):
+
+    def __init__(self, h5_path):
+        self.h5_path = '/Users/teff/Downloads/'
+        self.data_handler =  open_data_file(h5_path)
+        self.length = len(self.data_handler.root.data)
+
+    def __getitem__(self, index): #to enable indexing
+        # x, y = self.data_handler.root.data[index], np.array([self.data_handler.root.truth[index]])
+        x, y = self.data_handler.root.data[index], self.data_handler.root.truth[index]
+        return (
+                x,
+                y,
+        )
+
+    def __len__(self):
+        return self.length
+
+
+
+
 
 def fetch_training_data_files(path="data/original/"):
     training_data_files = list()

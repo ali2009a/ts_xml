@@ -11,7 +11,6 @@ config["pool_size"] = (2, 2)  # pool size for the max pooling operations
 config["labels"] = (1,)  # the label numbers on the input image
 config["n_labels"] = len(config["labels"])
 config["nb_channels"] = 1
-config["slice_based"] = True
 #iif "slice_based" in config and config["slice_based"] is True:
 #    config["input_shape"] = tuple([config["nb_channels"]] + list(config["image_shape"][:-1]))
 #else:
@@ -97,7 +96,7 @@ def main(overwrite=False, training_repo="data/original", logging_file="training.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image_shape", help="final image shape", default="[50,100]")
-    parser.add_argument("--data_file", help="absolute path to the h5 date file", default="ts_data.pkl")
+    parser.add_argument("--data_file", help="absolute path to the h5 date file", default="ts_data.h5")
     parser.add_argument("--model_file", help="absolute path to the model file", default="model.pkl")
     parser.add_argument("--training_keys_file", help="absolute path to the training keys", default="train_key_files.pkl")
     parser.add_argument("--validation_keys_file", help="absolute path to the validation keys", default="valid_key_files.pkl")
