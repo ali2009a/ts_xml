@@ -18,8 +18,8 @@ electrodes = ['FP1','FPZ','FP2','AF3','AF4','F7','F5','F3','F1','FZ','F2','F4','
 def main():
     if not os.path.exists(outPath):
         os.makedirs(outPath)
-    #copyLabels() 
-    copyFeatures()
+    copyLabels() 
+    #copyFeatures()
 
 
 def copyLabels():
@@ -27,8 +27,11 @@ def copyLabels():
     df[df["TEP"]=="GLOBAL"]
     df[df["COMPONENT"]=="P180"]
     dic={}
+    print("1")
     for index, row in df.iterrows():
+        print(index)
         dic[(row["ID"], row["TMS"], row["TRIAL"])] = row["AMPLITUDE"]
+    print("after for")
     pickle_dump(dic, os.path.join(outPath, "labels.pkl")) 
     
 
@@ -38,6 +41,7 @@ def copyFeatures():
         base_name = os.path.basename(subject_folder)
         file_name = os.path.splitext(base_name)[0]
         tokens = file_name.split("_")
+        #print(tokens)
         patient_ID = tokens[0]
         TMS = tokens[1]
         Type=tokens[2]
@@ -46,9 +50,13 @@ def copyFeatures():
         trial_key =(patient_ID, TMS, Type, trial)
         trial_keys.add(trial_key)
     trial_keys = list(trial_keys)
-    for trial_key in trial_keys[:5]:
+    print("list keys:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;")
+    print(trial_keys[:1])
+    for trial_key in trial_keys[:20]:
+        print(trial_key)
         patient_ID,TMS,Type,trial = trial_key[0],trial_key[1],trial_key[2],trial_key[3]
         folder_name = "{}_{}_{}_T{}".format(patient_ID,TMS,Type, trial)
+        print(folder_name)
         folder_path = os.path.join(outPath,folder_name)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)

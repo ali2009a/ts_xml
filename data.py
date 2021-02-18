@@ -42,11 +42,11 @@ class HDF5Dataset(Dataset):
         self.length = len(self.data_handler.root.data)
 
     def __getitem__(self, index): #to enable indexing
-        # x, y = self.data_handler.root.data[index], np.array([self.data_handler.root.truth[index]])
-        x, y = self.data_handler.root.data[index], self.data_handler.root.truth[index]
+        x, y = self.data_handler.root.data[index], np.array([self.data_handler.root.truth[index]])
+        #x, y = self.data_handler.root.data[index], self.data_handler.root.truth[index]
         return (
                 x.reshape(3000, 100),
-                y,
+                y.astype('float32')
         )
 
     def __len__(self):
@@ -144,7 +144,8 @@ def write_image_data_to_file(image_files, data_storage, image_shape):
 
 
 def add_data_to_storage(data_storage, subject_data):
-    data_storage.append(np.asarray(subject_data[:])[np.newaxis])
+    to_be_added = np.asarray(subject_data[:])[np.newaxis]
+    data_storage.append(to_be_added)
 
 
 def load_files(in_files):
