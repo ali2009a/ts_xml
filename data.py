@@ -16,7 +16,7 @@ electrodes = ['FP1','FPZ','FP2','AF3','AF4','F7','F5','F3','F1','FZ','F2','F4','
 
 def generator(h5_path, batch_size, validation_split):
     dataset = HDF5Dataset(h5_path)
-    dataloader = DataLoader(dataset, batch_size=2,shuffle=False, num_workers=0) 
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0) 
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor(validation_split * dataset_size))
@@ -46,7 +46,7 @@ class HDF5Dataset(Dataset):
         #x, y = self.data_handler.root.data[index], self.data_handler.root.truth[index]
         return (
                 x.reshape(3000, 100),
-                y.astype('float32')
+                (y*1000*1000).astype('float32')
         )
 
     def __len__(self):

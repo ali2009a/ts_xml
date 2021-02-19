@@ -18,8 +18,8 @@ electrodes = ['FP1','FPZ','FP2','AF3','AF4','F7','F5','F3','F1','FZ','F2','F4','
 def main():
     if not os.path.exists(outPath):
         os.makedirs(outPath)
-    copyLabels() 
-    #copyFeatures()
+    #copyLabels() 
+    copyFeatures()
 
 
 def copyLabels():
@@ -50,17 +50,15 @@ def copyFeatures():
         trial_key =(patient_ID, TMS, Type, trial)
         trial_keys.add(trial_key)
     trial_keys = list(trial_keys)
-    print("list keys:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;")
-    print(trial_keys[:1])
-    for trial_key in trial_keys[:20]:
-        print(trial_key)
+    for index  in range(2038, len(trial_keys)):
+        #if index%10==0:
+        print(index)
+        trial_key  = trial_keys[index]
         patient_ID,TMS,Type,trial = trial_key[0],trial_key[1],trial_key[2],trial_key[3]
         folder_name = "{}_{}_{}_T{}".format(patient_ID,TMS,Type, trial)
-        print(folder_name)
         folder_path = os.path.join(outPath,folder_name)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
-        print(subject_folder) 
         for elect in electrodes:
             elec_file = os.path.join(DataPath,"{}_{}_{}_{}_T{}.mat".format(patient_ID,TMS,Type, elect, trial))
             elec_data = scipy.io.loadmat(elec_file)
@@ -76,10 +74,7 @@ def saveFiles(relevant_files, new_subject_dir):
             trial_data = scipy.io.loadmat(fileName)
             trial_data = trial_data["HS"]
             data_reduced  = arr_reduced = block_reduce(trial_data, block_size=(1,30), func=np.mean, cval=np.mean(trial_data))
-            print(data_reduced.shape)
-            print(arr.shape)
             arr=np.concatenate((arr,data_reduced))
-            print(arr.shape)
         np.save(new_subject_dir, arr)
         #subjectName = os.path.basename(os.path.normpath(subject_folder))
         #if not os.path.exists(new_subject_folder):
