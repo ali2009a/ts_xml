@@ -34,15 +34,15 @@ def main(args):
     optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
 
     best_test_loss=100
-    best_test_acc = -1
+    #best_test_acc = -1
     for epoch in range(1, args.epochs+1):
         print("epoch: {}".format(epoch))
         model,optimizer = train(args,epoch,model,train_loader,optimizer)
         test_loss,test_acc = test(args,model,test_loader)
-        #if(test_loss<best_test_loss):
-        if(test_acc> best_test_acc):
-            #best_test_loss = test_loss
-            best_test_acc = test_acc
+        if(test_loss<best_test_loss):
+        #if(test_acc> best_test_acc):
+            best_test_loss = test_loss
+            #best_test_acc = test_acc
             save(model, model_filename)
         if(test_acc>=0.9):
             break
