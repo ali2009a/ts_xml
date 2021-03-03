@@ -22,7 +22,7 @@ def main(args):
         truthData = data.getTruthData(subject_ids, args.labels_repo)
         data.write_data_to_file(training_files, args.data_file, image_shape=[args.NumFeatures, args.NumTimeSteps], subject_ids=subject_ids, truthData=truthData)
 
-    train_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, validation_split=0.05)
+    train_loader, val_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, train_split=0.9, validation_split=0.05)
     m = "TCN"
     channel_sizes = [args.nhid] * args.levels
     model = TCN(3000, args.n_classes, channel_sizes, kernel_size=args.ksize, dropout=args.dropout)
@@ -38,7 +38,7 @@ def main(args):
     for epoch in range(1, args.epochs+1):
         print("epoch: {}".format(epoch))
         model,optimizer = train(args,epoch,model,train_loader,optimizer)
-        test_loss,test_acc = test(args,model,test_loader)
+        test_loss,test_acc = test(args,model,val_loader)
         if(test_loss<best_test_loss):
         #if(test_acc> best_test_acc):
             best_test_loss = test_loss

@@ -14,24 +14,60 @@ import torch
 electrodes = ['FP1','FPZ','FP2','AF3','AF4','F7','F5','F3','F1','FZ','F2','F4','F6','F8','FT7','FC5','FC3','FC1','FCZ','FC2','FC4','FC6','FT8','T7','C5','C3','C1','CZ','C2','C4','C6','T8','TP7','CP5','CP3','CP1','CPZ','CP2','CP4','CP6','TP8','P7','P5','P3','P1','PZ','P2','P4','P6','P8','PO7','PO5','PO3','POZ','PO4','PO6','PO8','O1','OZ','O2']
 
 
-def generator(h5_path, batch_size, validation_split):
+def generator(h5_path, batch_size, train_split, validation_split, indice_file_path="indices.pkl"):
     dataset = HDF5Dataset(h5_path)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0) 
-    dataset_size = len(dataset)
-    indices = list(range(dataset_size))
-    split = int(np.floor(validation_split * dataset_size))
-    train_indices, val_indices = indices[split:], indices[:split]
-    print (train_indices)
-    print(val_indices)
+    
+    if os.path.exists(indice_file_path):
+        print("loading split...")
+        with open(indice_file_path,"rb") as f:
+            train_indices, val_indices, test_indices = pickle.load(f)
+    else:
+        print("generating new split...")
+        unique_ids = dataset.getIDs()
+        print(unique_ids)
+        print(len(unique_ids))
+        ids_len = len(unique_ids)
+         
+        id_indices = list(range(ids_len))
+        split1 = int(np.floor(train_split * ids_len))
+        split2 = int(np.ceil(validation_split * ids_len))
+        print("s1: {}, s2: {}".format(split1, split2))
+        train_id_indices, val_id_indices, test_id_indices = id_indices[:split1], id_indices[split1:split1+split2], id_indices[split1+split2:]
+        train_indices = dataset.getIndicesForIDs(train_id_indices, unique_ids)
+        val_indices = dataset.getIndicesForIDs(val_id_indices, unique_ids)
+        test_indices = dataset.getIndicesForIDs(test_id_indices, unique_ids)
+
+    
+        #dataset_size = len(dataset)
+        #print("ds size:")
+        #print(dataset_size)
+        #indices = list(range(dataset_size))
+        #split1 =  int(np.floor(train_split * dataset_size))
+        #split2 = int(np.ceil(validation_split * dataset_size))
+        #train_indices, val_indices, test_indices = indices[:split1], indices[split1:split1+split2], indices[split1+split2:]
+
+        with open(indice_file_path, "wb") as f:
+            pickle.dump([train_indices, val_indices, test_indices], f)
+    print ("indices:::::")
+    print(len(dataset))
+    tr = set(train_indices)
+    vl = set(val_indices)
+    ts = set(test_indices)
+    print (len(tr))
+    print(len(vl))
+    print(len(ts))
+    print(len(tr.union(vl, ts)))
     train_sampler = torch_data.SubsetRandomSampler(train_indices)
     valid_sampler = torch_data.SubsetRandomSampler(val_indices)
-    print(len(train_sampler))
-    print(len(valid_sampler))
+    test_sampler = torch_data.SubsetRandomSampler(test_indices)
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, 
                                                sampler=train_sampler)
     validation_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                                     sampler=valid_sampler)
-    return train_loader, validation_loader
+    test_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+                                                    sampler=test_sampler)
+    return train_loader, validation_loader, test_loader
 
 
 class HDF5Dataset(Dataset):
@@ -51,9 +87,28 @@ class HDF5Dataset(Dataset):
 
     def __len__(self):
         return self.length
+    
+    def getIDs(self):
+        subject_ids = self.data_handler.root.subject_ids[:]
+        p_ids = set()
+        for s in subject_ids:
+            s= str(s)[2:]
+            tokens = s.split("_")
+            patient_id = tokens[0]
+            p_ids.add(patient_id)
+        return list(p_ids)            
 
-
-
+    def getIndicesForIDs(self, id_indices, ids):
+        subject_ids = self.data_handler.root.subject_ids[:]
+        target_ids = [ids[x] for x in id_indices]
+        indices = []
+        for index, s in enumerate(subject_ids):
+            s= str(s)[2:]
+            tokens = s.split("_")
+            patient_id = tokens[0]
+            if patient_id in target_ids:
+                indices.append(index)
+        return indices
 
 
 def fetch_training_data_files(path="data/original/"):
@@ -71,6 +126,7 @@ def fetch_training_data_files(path="data/original/"):
         training_data_files.append(tuple(subject_files))
     print(training_data_files)
     return training_data_files, subject_ids
+
 
 def getTruthData(subject_ids, labelPath):
     truthData = pickle_load(labelPath) 
