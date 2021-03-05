@@ -10,15 +10,29 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import torch.utils.data as torch_data
 import torch
+from sklearn.model_selection import KFold
+from sklearn.model_selection import train_test_split
 
 electrodes = ['FP1','FPZ','FP2','AF3','AF4','F7','F5','F3','F1','FZ','F2','F4','F6','F8','FT7','FC5','FC3','FC1','FCZ','FC2','FC4','FC6','FT8','T7','C5','C3','C1','CZ','C2','C4','C6','T8','TP7','CP5','CP3','CP1','CPZ','CP2','CP4','CP6','TP8','P7','P5','P3','P1','PZ','P2','P4','P6','P8','PO7','PO5','PO3','POZ','PO4','PO6','PO8','O1','OZ','O2']
 
 
-def generator(h5_path, batch_size, train_split, validation_split, indice_file_path="indices.pkl"):
+
+def getFold(id_indices, kFold, fold, validation_split):
+    print("executed kFold")
+    kf = KFold(n_splits=kFold)
+    folds = []
+    for train_index, test_index in kf.split(id_indices):
+        folds.append((train_index, test_index))
+    train_id_indices, val_id_indices = train_test_split(folds[fold][0], test_size = validation_split, shuffle=False)        
+    test_id_indices = folds[fold][1]
+    return train_id_indices, val_id_indices, test_id_indices    
+
+
+def generator(h5_path, batch_size, validation_split, indice_file_path="indices.pkl", kFold=None, fold=None):
     dataset = HDF5Dataset(h5_path)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0) 
     
-    if os.path.exists(indice_file_path):
+    if os.path.exists(indice_file_path) and False:
         print("loading split...")
         with open(indice_file_path,"rb") as f:
             train_indices, val_indices, test_indices = pickle.load(f)
@@ -26,26 +40,14 @@ def generator(h5_path, batch_size, train_split, validation_split, indice_file_pa
         print("generating new split...")
         unique_ids = dataset.getIDs()
         print(unique_ids)
-        print(len(unique_ids))
         ids_len = len(unique_ids)
          
         id_indices = list(range(ids_len))
-        split1 = int(np.floor(train_split * ids_len))
-        split2 = int(np.ceil(validation_split * ids_len))
-        print("s1: {}, s2: {}".format(split1, split2))
-        train_id_indices, val_id_indices, test_id_indices = id_indices[:split1], id_indices[split1:split1+split2], id_indices[split1+split2:]
+        train_id_indices, val_id_indices, test_id_indices = getFold(id_indices, kFold, fold, validation_split)
+
         train_indices = dataset.getIndicesForIDs(train_id_indices, unique_ids)
         val_indices = dataset.getIndicesForIDs(val_id_indices, unique_ids)
         test_indices = dataset.getIndicesForIDs(test_id_indices, unique_ids)
-
-    
-        #dataset_size = len(dataset)
-        #print("ds size:")
-        #print(dataset_size)
-        #indices = list(range(dataset_size))
-        #split1 =  int(np.floor(train_split * dataset_size))
-        #split2 = int(np.ceil(validation_split * dataset_size))
-        #train_indices, val_indices, test_indices = indices[:split1], indices[split1:split1+split2], indices[split1+split2:]
 
         with open(indice_file_path, "wb") as f:
             pickle.dump([train_indices, val_indices, test_indices], f)
@@ -96,11 +98,14 @@ class HDF5Dataset(Dataset):
             tokens = s.split("_")
             patient_id = tokens[0]
             p_ids.add(patient_id)
-        return list(p_ids)            
+        p_ids = list(p_ids)
+        p_ids.sort()
+        return list(p_ids)           
 
     def getIndicesForIDs(self, id_indices, ids):
         subject_ids = self.data_handler.root.subject_ids[:]
         target_ids = [ids[x] for x in id_indices]
+ 
         indices = []
         for index, s in enumerate(subject_ids):
             s= str(s)[2:]
@@ -124,7 +129,7 @@ def fetch_training_data_files(path="data/original/"):
         for modality in electrodes:
             subject_files.append(os.path.join(subject_dir, modality+ ".npy"))
         training_data_files.append(tuple(subject_files))
-    print(training_data_files)
+    #print(training_data_files)
     return training_data_files, subject_ids
 
 
@@ -132,13 +137,18 @@ def getTruthData(subject_ids, labelPath):
     truthData = pickle_load(labelPath) 
     labels = []
     for subj in subject_ids:
+        print(subj)
         tokens = subj.split("_")
         patient_id = tokens[0]
         TMS= tokens[1]
         Type=tokens[2]
         trial = int(tokens[3][1:])
         key=(patient_id, TMS, trial)
-        labels.append(truthData[key])
+        if key in truthData:
+            labels.append(truthData[key])
+        else:
+            key=(patient_id, TMS[:-1], trial)
+            labels.append(truthData[key])
     return labels
         
 
@@ -178,9 +188,9 @@ def create_data_file(out_file, n_channels, n_samples, image_shape, subject_ids, 
     #                                        filters=filters, expectedrows=n_samples)
     #                                         filters=filters, expectedrows=n_samples)
     #                                                 filters=filters, expectedrows=n_samples)
-    print("to be added")
-    print(subject_ids)
-    print(truthData)
+    #print("to be added")
+    #print(subject_ids)
+    #print(truthData)
     hdf5_file.create_array(hdf5_file.root, 'subject_ids', obj=subject_ids)
     hdf5_file.create_array(hdf5_file.root, 'truth', obj=truthData)
     print("created file:")

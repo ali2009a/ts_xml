@@ -10,9 +10,57 @@ from tqdm import tqdm
 import data
 from torchsummary import summary
 import sklearn.metrics as metrics
+import warnings
+warnings.filterwarnings("ignore")
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 models=["TCN"]
+
+
+def createDataFile(args):
+    print("creating file...")
+    if not os.path.exists(args.data_file) or True:
+        print("Writing the images to h5 file...")
+        training_files, subject_ids = data.fetch_training_data_files(args.features_repo)
+        truthData = data.getTruthData(subject_ids, args.labels_repo)
+        data.write_data_to_file(training_files, args.data_file, image_shape=[args.NumFeatures, args.NumTimeSteps], subject_ids=subject_ids, truthData=truthData)
+
+def trainFold(args, k, train_loader, val_loader, test_loader):
+    print("k:{}".format(k))
+    m = "TCN"
+    channel_sizes = [args.nhid] * args.levels
+    model = TCN(3000, args.n_classes, channel_sizes, kernel_size=args.ksize, dropout=args.dropout)
+    summary(model, (3000,100))
+    model.to(device)
+    model_name = "k_{}_model_{}_NumFeatures_{}".format(k, m, args.NumFeatures*60)
+    model_filename = args.model_dir + 'm_' + model_name + '.pt'
+    lr=args.lr
+    optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
+    best_test_loss=100
+    for epoch in range(1, args.epochs+1):
+        print("epoch: {}".format(epoch))
+        model,optimizer = train(args,epoch,model,train_loader,optimizer)
+        print("validation set:::")
+        test_loss,test_acc = test(args,model,val_loader)
+        print("test set::::")
+        test(args,model,test_loader)
+        if(test_loss<best_test_loss):
+            best_test_loss = test_loss
+            save(model, model_filename)
+        if(test_acc>=0.9):
+            break
+        if epoch % 10 == 0:
+            lr /= 10
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
+
+def main_k(args):
+    #createDataFile(args)
+    k=10
+    for i in range(0,10):
+        train_loader, val_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, validation_split=0.1, kFold=k, fold=i)
+        trainFold(args, i, train_loader, val_loader, test_loader)
+
 
 def main(args):
     torch.manual_seed(args.seed)
@@ -22,7 +70,7 @@ def main(args):
         truthData = data.getTruthData(subject_ids, args.labels_repo)
         data.write_data_to_file(training_files, args.data_file, image_shape=[args.NumFeatures, args.NumTimeSteps], subject_ids=subject_ids, truthData=truthData)
 
-    train_loader, val_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, train_split=0.9, validation_split=0.05)
+    train_loader, val_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, validation_split=0.1, kFold=10, fold=0)
     m = "TCN"
     channel_sizes = [args.nhid] * args.levels
     model = TCN(3000, args.n_classes, channel_sizes, kernel_size=args.ksize, dropout=args.dropout)
@@ -105,7 +153,9 @@ def test(args,model,test_loader):
 
         test_loss /= len(test_loader.dataset)
         #Acc = 100. * correct / len(test_loader.dataset)
-        Acc = metrics.explained_variance_score(total_targets.reshape((-1)), total_predictions.reshape((-1)))
+        total_targets = total_targets.reshape((-1))
+        total_predictions = total_predictions.reshape((-1))
+        Acc = metrics.explained_variance_score(total_targets, total_predictions)
         message = ('\nTest set: Average loss: {:.10f}, accuracy: {})\n'.format(
             test_loss, Acc))
         print(message)
@@ -146,7 +196,7 @@ def parse_arguments(argv):
 
 
     parser.add_argument('--data_dir', type=str, default="../Data/")
-    parser.add_argument('--model_dir', type=str, default="../Models/")
+    parser.add_argument('--model_dir', type=str, default="/home/aliarab/scratch/pojects/EEG/wd/Models/")
 
 
     parser.add_argument('--NumTimeSteps',type=int,default=100)
@@ -159,11 +209,28 @@ def parse_arguments(argv):
     parser.add_argument('--d_a', type=int, default=30)
 
     parser.add_argument('--data_file', type=str, default="ts_data.h5")
-    parser.add_argument('--features_repo', type=str, default="data/original")
+    parser.add_argument('--features_repo', type=str, default="/home/aliarab/scratch/pojects/EEG/processed/LPFC")
     parser.add_argument('--labels_repo', type=str, default="data/original/labels.pkl")
 
-
+    parser.add_argument("--writeOnly", action='store_true')
+    parser.add_argument("--sham", action='store_true')
     return  parser.parse_args()
 
 if __name__ == '__main__':
-    main(parse_arguments(sys.argv[1:]))
+    #main(parse_arguments(sys.argv[1:]))
+    args = parse_arguments(sys.argv[1:])
+    if args.writeOnly:
+        if args.sham:
+            args.features_repo="/home/aliarab/scratch/pojects/EEG/processed/sham/LPFC"
+            args.data_file = "ts_data_sham.h5"
+            args.labels_repo = "/home/aliarab/scratch/pojects/EEG/processed/labels_sham.pkl" 
+        else:
+            args.features_repo="/home/aliarab/scratch/pojects/EEG/processed/LPFC"
+            args.data_file = "ts_data.h5"
+            args.labels_repo = "/home/aliarab/scratch/pojects/EEG/processed/labels.pkl"
+        createDataFile(args)
+    else:    
+        print("main executed....")
+        main_k(args)
+
+
