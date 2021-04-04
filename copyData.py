@@ -9,7 +9,7 @@ import scipy.io
 import pandas as pd
 from data import pickle_dump
 
-DataPath = "/home/aliarab/scratch/pojects/EEG/raw/LPFC"
+DataPath = "/home/aliarab/scratch/pojects/EEG/raw/"
 labelPath  = "/home/aliarab/scratch/pojects/EEG/processed/ALL_TEP_sham.csv"
 outPath  = "/home/aliarab/scratch/pojects/EEG/processed/"
 
@@ -18,32 +18,23 @@ electrodes = ['FP1','FPZ','FP2','AF3','AF4','F7','F5','F3','F1','FZ','F2','F4','
 def main():
     if not os.path.exists(outPath):
         os.makedirs(outPath)
-    copyLabels(True) 
+    #copyLabels(True) 
     #copyFeatures()
 
 
-def copyLabels(sham=False):
+def copyLabels(labelPath, outPath, TEP, COMPONENT, TMS_TYPE):
     df=pd.read_csv(labelPath)
     df=df[df["TEP"]=="GLOBAL"]
     df=df[df["COMPONENT"]=="N100"]
-    if sham:
-        df=df[df["TMS_TYPE"]=="SHAM"]
-    else:
-        df=df[df["TMS_TYPE"]=="ACTIVE"]    
+    df=df[df["TMS_TYPE"]==TMS_TYPE]  #TMS_TYPE could be either SHAM or ACTIVE
     dic={}
-    print("1")
     for index, row in df.iterrows():
         print(index)
         dic[(row["ID"], row["TMS"], row["TRIAL"])] = row["AMPLITUDE"]
-    print("after for")
-    if sham:
-        fileName="labels_sham.pkl"
-    else:
-        fileName = "labels.pkl"
-    pickle_dump(dic, os.path.join(outPath, fileName)) 
+    pickle_dump(dic, outPath) 
     
 
-def copyFeatures():
+def copyFeatures(DataPath, outPath):
     trial_keys=set()
     for subject_folder in glob.glob(os.path.join(DataPath, "*")):
         base_name = os.path.basename(subject_folder)
@@ -59,7 +50,6 @@ def copyFeatures():
         trial_keys.add(trial_key)
     trial_keys = list(trial_keys)
     for index  in range(0, len(trial_keys)):
-        #if index%10==0:
         print(index)
         trial_key  = trial_keys[index]
         patient_ID,TMS,Type,trial = trial_key[0],trial_key[1],trial_key[2],trial_key[3]
@@ -89,5 +79,5 @@ def saveFiles(relevant_files, new_subject_dir):
         #    os.makedirs(new_subject_folder)
 
 
-main()
+#main()
 

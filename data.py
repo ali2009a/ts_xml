@@ -12,6 +12,7 @@ import torch.utils.data as torch_data
 import torch
 from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
+import random
 
 electrodes = ['FP1','FPZ','FP2','AF3','AF4','F7','F5','F3','F1','FZ','F2','F4','F6','F8','FT7','FC5','FC3','FC1','FCZ','FC2','FC4','FC6','FT8','T7','C5','C3','C1','CZ','C2','C4','C6','T8','TP7','CP5','CP3','CP1','CPZ','CP2','CP4','CP6','TP8','P7','P5','P3','P1','PZ','P2','P4','P6','P8','PO7','PO5','PO3','POZ','PO4','PO6','PO8','O1','OZ','O2']
 
@@ -28,7 +29,7 @@ def getFold(id_indices, kFold, fold, validation_split):
     return train_id_indices, val_id_indices, test_id_indices    
 
 
-def generator(h5_path, batch_size, validation_split, indice_file_path="indices.pkl", kFold=None, fold=None):
+def generator(h5_path, batch_size, validation_split, indice_file_path="indices.pkl", kFold=None, fold=None, allowShare=False, shuffle=False):
     dataset = HDF5Dataset(h5_path)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0) 
     
@@ -38,17 +39,24 @@ def generator(h5_path, batch_size, validation_split, indice_file_path="indices.p
             train_indices, val_indices, test_indices = pickle.load(f)
     else:
         print("generating new split...")
-        unique_ids = dataset.getIDs()
-        print(unique_ids)
-        ids_len = len(unique_ids)
-         
-        id_indices = list(range(ids_len))
-        train_id_indices, val_id_indices, test_id_indices = getFold(id_indices, kFold, fold, validation_split)
+        if not allowShare:
+            unique_ids = dataset.getIDs()
+            print(unique_ids)
+            ids_len = len(unique_ids)
+             
+            id_indices = list(range(ids_len))
+            train_id_indices, val_id_indices, test_id_indices = getFold(id_indices, kFold, fold, validation_split)
 
-        train_indices = dataset.getIndicesForIDs(train_id_indices, unique_ids)
-        val_indices = dataset.getIndicesForIDs(val_id_indices, unique_ids)
-        test_indices = dataset.getIndicesForIDs(test_id_indices, unique_ids)
-
+            train_indices = dataset.getIndicesForIDs(train_id_indices, unique_ids)
+            val_indices = dataset.getIndicesForIDs(val_id_indices, unique_ids)
+            test_indices = dataset.getIndicesForIDs(test_id_indices, unique_ids)
+        else:
+            print("allowed sharing...")
+            id_indices = list(range(len(dataset)))
+            if shuffle:
+                random.Random(4).shuffle(id_indices)
+            train_indices, val_indices, test_indices = getFold(id_indices, kFold, fold, validation_split)
+       
         with open(indice_file_path, "wb") as f:
             pickle.dump([train_indices, val_indices, test_indices], f)
     print ("indices:::::")
@@ -130,7 +138,7 @@ def fetch_training_data_files(path="data/original/"):
             subject_files.append(os.path.join(subject_dir, modality+ ".npy"))
         training_data_files.append(tuple(subject_files))
     #print(training_data_files)
-    return training_data_files, subject_ids
+    return training_data_files[:20], subject_ids[:20]
 
 
 def getTruthData(subject_ids, labelPath):

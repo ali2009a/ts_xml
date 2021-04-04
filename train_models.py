@@ -13,6 +13,9 @@ import sklearn.metrics as metrics
 import warnings
 warnings.filterwarnings("ignore")
 
+import importlib
+importlib.reload(data)
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 models=["TCN"]
 
@@ -43,7 +46,7 @@ def trainFold(args, k, train_loader, val_loader, test_loader):
         print("validation set:::")
         test_loss,test_acc = test(args,model,val_loader)
         print("test set::::")
-        test(args,model,test_loader)
+        #test(args,model,test_loader)
         if(test_loss<best_test_loss):
             best_test_loss = test_loss
             save(model, model_filename)
@@ -58,7 +61,7 @@ def main_k(args):
     #createDataFile(args)
     k=10
     for i in range(0,10):
-        train_loader, val_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, validation_split=0.1, kFold=k, fold=i)
+        train_loader, val_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, validation_split=0.1, kFold=k, fold=i, allowShare=True, shuffle=True)
         trainFold(args, i, train_loader, val_loader, test_loader)
 
 
@@ -76,8 +79,9 @@ def main(args):
     model = TCN(3000, args.n_classes, channel_sizes, kernel_size=args.ksize, dropout=args.dropout)
     summary(model, (3000,100))
     model.to(device)
-    model_name = "model_{}_NumFeatures_{}".format(m,args.NumFeatures)
-    model_filename = args.model_dir + 'm_' + model_name + '.pt'
+    #model_name = "model_{}_NumFeatures_{}".format(m,args.NumFeatures*60)
+    #model_filename = args.model_dir + 'm_' + model_name + '.pt'
+    model_filename = args.model_dir
     lr=args.lr
     optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
 
@@ -161,7 +165,7 @@ def test(args,model,test_loader):
         print(message)
         return test_loss,Acc
 
-def parse_arguments(argv):
+def parse_arguments(raw_args):
     parser = argparse.ArgumentParser()
 
 
@@ -214,23 +218,15 @@ def parse_arguments(argv):
 
     parser.add_argument("--writeOnly", action='store_true')
     parser.add_argument("--sham", action='store_true')
-    return  parser.parse_args()
+    return  parser.parse_args(raw_args)
 
 if __name__ == '__main__':
-    #main(parse_arguments(sys.argv[1:]))
     args = parse_arguments(sys.argv[1:])
-    if args.writeOnly:
-        if args.sham:
-            args.features_repo="/home/aliarab/scratch/pojects/EEG/processed/sham/LPFC"
-            args.data_file = "ts_data_sham.h5"
-            args.labels_repo = "/home/aliarab/scratch/pojects/EEG/processed/labels_sham.pkl" 
-        else:
-            args.features_repo="/home/aliarab/scratch/pojects/EEG/processed/LPFC"
-            args.data_file = "ts_data.h5"
-            args.labels_repo = "/home/aliarab/scratch/pojects/EEG/processed/labels.pkl"
-        createDataFile(args)
-    else:    
-        print("main executed....")
-        main_k(args)
+    main_k(args)
 
 
+def main_train(raw_args):
+    args = parse_arguments(raw_args)
+    main(args) 
+
+    
