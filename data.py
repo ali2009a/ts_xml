@@ -138,7 +138,7 @@ def fetch_training_data_files(path="data/original/"):
             subject_files.append(os.path.join(subject_dir, modality+ ".npy"))
         training_data_files.append(tuple(subject_files))
     #print(training_data_files)
-    return training_data_files[:20], subject_ids[:20]
+    return training_data_files, subject_ids
 
 
 def getTruthData(subject_ids, labelPath):
@@ -221,11 +221,11 @@ def add_data_to_storage(data_storage, subject_data):
     to_be_added = np.asarray(subject_data[:])[np.newaxis]
     data_storage.append(to_be_added)
 
-
 def load_files(in_files):
     data_list=[]
+    print(len(in_files))
     for f in in_files:
-        data=np.load(f)
+        data=np.load(f, allow_pickle=False)
         data_list.append(data)
     return data_list
 

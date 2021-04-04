@@ -8,6 +8,7 @@ from skimage.measure import block_reduce
 import scipy.io
 import pandas as pd
 from data import pickle_dump
+import time
 
 DataPath = "/home/aliarab/scratch/pojects/EEG/raw/"
 labelPath  = "/home/aliarab/scratch/pojects/EEG/processed/ALL_TEP_sham.csv"
@@ -40,7 +41,6 @@ def copyFeatures(DataPath, outPath):
         base_name = os.path.basename(subject_folder)
         file_name = os.path.splitext(base_name)[0]
         tokens = file_name.split("_")
-        #print(tokens)
         patient_ID = tokens[0]
         TMS = tokens[1]
         Type=tokens[2]
@@ -49,22 +49,38 @@ def copyFeatures(DataPath, outPath):
         trial_key =(patient_ID, TMS, Type, trial)
         trial_keys.add(trial_key)
     trial_keys = list(trial_keys)
-    for index  in range(0, len(trial_keys)):
+    #for index  in range(0, len(trial_keys)):
+    print(trial_keys[:3])
+    for index in tqdm(range(0, 5)):
         print(index)
         trial_key  = trial_keys[index]
         patient_ID,TMS,Type,trial = trial_key[0],trial_key[1],trial_key[2],trial_key[3]
+
+        isComplete=True
+        for elect in electrodes:
+            elec_file = os.path.join(DataPath,"{}_{}_{}_{}_T{}.mat".format(patient_ID,TMS,Type, elect, trial))
+            if not os.path.exists(elec_file):
+                isComplete=False
+                print("missing file:")
+                print(elec_file)
+                continue
+
+        if isComplete==False:
+            print("skipped: {}".format(trial_key))
+            continue
+
         folder_name = "{}_{}_{}_T{}".format(patient_ID,TMS,Type, trial)
         folder_path = os.path.join(outPath,folder_name)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
+
         for elect in electrodes:
             elec_file = os.path.join(DataPath,"{}_{}_{}_{}_T{}.mat".format(patient_ID,TMS,Type, elect, trial))
             elec_data = scipy.io.loadmat(elec_file)
             elec_data = elec_data["HS"]
             elec_data_reduced = block_reduce(elec_data, block_size=(1,30), func=np.mean, cval=np.mean(elec_data))
             new_subject_dir = os.path.join(folder_path, "{}".format(elect))
-            np.save(new_subject_dir, elec_data_reduced)
-   
+            np.save(new_subject_dir, elec_data_reduced, allow_pickle=False)
 
 def saveFiles(relevant_files, new_subject_dir):        
         arr = np.empty((0,100))

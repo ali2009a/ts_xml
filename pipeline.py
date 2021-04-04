@@ -2,6 +2,11 @@ import os
 import copyData
 import train_models
 import interpret
+import sys
+import argparse
+
+import importlib
+importlib.reload(copyData)
 
 def main(args):
     raw_path = "/home/aliarab/scratch/pojects/EEG/raw"
@@ -10,10 +15,10 @@ def main(args):
     data_path  = "../h5Files/"
     scores_path = "../scores/"
     
-    TMS= "LPFC"
-    TEP="GLOBAL"
-    component= "P30"
-    TMS_TYPE= "ACTIVE"
+    #TMS= "LPFC"
+    #TEP="GLOBAL"
+    #component= "P30"
+    #TMS_TYPE= "ACTIVE"
 
     TMS = args.TMS
     TEP= args.TEP
@@ -29,6 +34,7 @@ def main(args):
     
     #raw_features_path = os.path.join(raw_path, "features", "{}_{}".format(TMS_TYPE, TMS))
     processed_features_path = os.path.join(processed_path , "features", "{}_{}".format(TMS_TYPE, TMS))
+    #copyData.copyFeatures(raw_features_path, processed_features_path)
 
     features_repo = processed_features_path
     labels_repo   = processed_labelPath
