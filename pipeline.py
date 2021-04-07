@@ -15,9 +15,9 @@ def main(args):
     data_path  = "../h5Files/"
     scores_path = "../scores/"
     
-    #TMS= "LPFC"
+    #TMS= "LMC"
     #TEP="GLOBAL"
-    #component= "P30"
+    #component= "P180"
     #TMS_TYPE= "ACTIVE"
 
     TMS = args.TMS
@@ -32,9 +32,10 @@ def main(args):
     copyData.copyLabels(raw_labelPath, processed_labelPath, TEP, component, TMS_TYPE)
 
     
-    #raw_features_path = os.path.join(raw_path, "features", "{}_{}".format(TMS_TYPE, TMS))
+    raw_features_path = os.path.join(raw_path, "features", "{}_{}".format(TMS_TYPE, TMS))
     processed_features_path = os.path.join(processed_path , "features", "{}_{}".format(TMS_TYPE, TMS))
-    #copyData.copyFeatures(raw_features_path, processed_features_path)
+    copyData.copyFeatures(raw_features_path, processed_features_path)
+   # processed_features_path = "/home/aliarab/scratch/pojects/EEG/processed/features/ACTIVE_LMC_permuted"
 
     features_repo = processed_features_path
     labels_repo   = processed_labelPath
@@ -44,8 +45,8 @@ def main(args):
     args = ["--features_repo", features_repo, "--labels_repo", labels_repo,"--data_file", data_file, "--model_dir", model_dir]
     train_models.main_train(args)
 
-    resultPath = os.path.join(scores_path, "{}_{}_{}_{}.npy".format(TMS_TYPE, TEP, component, TMS))
-    interpret.main(model_dir, data_file, resultPath)
+    resultPath = os.path.join(scores_path, "{}_{}_{}_{}_{}.npy".format("TSR", TMS_TYPE, TEP, component, TMS))
+    interpret.main(model_dir, data_file, resultPath, "IG")
 
     
 def parse_arguments(argv):

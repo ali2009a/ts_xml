@@ -301,4 +301,33 @@ def convert_data_file_to_image(image_indices, hdf5_file, output_dir="."):
         convert_data_file_indice_to_image(data_index=index, output_dir=case_directory, data_file=data_file)    
     data_file.close()
 
-"""    
+""" 
+
+def permuteDS(inPath, outPath):
+    subject_folders = []
+    for subject_folder in glob.glob(os.path.join(inPath, "*")):
+        subject_folders.append(subject_folder)
+    for subject_folder in subject_folders[:500]:
+        print(subject_folder)
+        base_name = os.path.basename(subject_folder)
+        tokens=base_name.split("_")
+        if len(tokens)<3:
+            continue
+        patient_id = tokens[0]
+        TMS= tokens[1]
+        Type=tokens[2]
+        trial = int(tokens[3][1:])
+        
+        for elec in electrodes:
+            infile = os.path.join(subject_folder,"{}.npy".format(elec))
+            outFolder = os.path.join(outPath, base_name)
+            outFile = os.path.join(outFolder, "{}.npy".format(elec))
+            if not os.path.exists(outFolder):
+                os.makedirs(outFolder)
+            data=np.load(infile)
+            shape = data.shape
+            reshaped = data.reshape((-1))
+            permuted = np.random.permutation(reshaped)
+            newData = permuted.reshape(shape)
+            np.save(outFile, newData, allow_pickle=False)
+

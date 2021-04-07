@@ -42,7 +42,7 @@ def givenAttGetRescaledSaliency(args,attributions,isTensor=True):
     return rescaledSaliency
 
 
-def main(model_filename, datafile, resultPath):
+def main(model_filename, datafile, resultPath, method="FA"):
     #model_filename ="../Models/m_k_0_model_TCN_NumFeatures_3000.pt"
     pretrained_model = torch.load(open(model_filename, "rb"),map_location=device)
     pretrained_model.to(device)    
@@ -57,11 +57,11 @@ def main(model_filename, datafile, resultPath):
 
     for index, (x_data , target) in tqdm(enumerate(dataloader)):
         print(index)
-        saliency_ = processImage(x_data, target, FA)
+        saliency_ = processImage(x_data, target, IG, method)
         arrays.append(saliency_)
         np.save(resultPath, arrays)
  
-def processImage(x_data, target, FA):
+def processImage(x_data, target, IG, method):
     labels =  target.to(device)
     input = x_data.to(device)
     input = Variable(input,  volatile=False, requires_grad=True)
@@ -69,20 +69,69 @@ def processImage(x_data, target, FA):
     target_=target.data.cpu().numpy()[0]
     args=""
     baseline_single=torch.Tensor(np.random.random(input.shape)).to(device)
-
+    
     #attributions = Grad.attribute(input)
     #saliency_= givenAttGetRescaledSaliency(args,attributions)    
 
-    attributions = FA.attribute(input)
-    saliency_= givenAttGetRescaledSaliency(args,attributions)
+    if method=="FA":
+        attributions = FA.attribute(input)
+        saliency_= givenAttGetRescaledSaliency(args,attributions)
 
     #attributions = SG.attribute(input)        
     #saliency_= givenAttGetRescaledSaliency(args,attributions)
 
-    #attributions = IG.attribute(input, baselines=baseline_single)
-    #saliency_= givenAttGetRescaledSaliency(args,attributions)
-    
+    if method=="IG":
+        #attributions = IG.attribute(input, baselines=baseline_single)
+        #saliency_= givenAttGetRescaledSaliency(args,attributions)
+        TSR_attributions =getTwoStepRescaling(IG, input, 100, 3000, labels,hasBaseline=baseline_single)
+        saliency_= givenAttGetRescaledSaliency(args, TSR_attributions, isTensor=False)
     return saliency_
+
+
+def getTwoStepRescaling(Grad, input, sequence_length,input_size, TestingLabel,hasBaseline=None,hasFeatureMask=None,hasSliding_window_shapes=None):
+    assignment=input[0,0,0]
+    timeGrad=np.zeros((1,sequence_length))
+    inputGrad=np.zeros((input_size,1))
+    newGrad=np.zeros((input_size, sequence_length))
+    if(hasBaseline==None):  
+        ActualGrad = Grad.attribute(input,target=TestingLabel).data.cpu().numpy()
+    else:
+        if(hasFeatureMask!=None):
+            ActualGrad = Grad.attribute(input,baselines=hasBaseline, target=TestingLabel,feature_mask=hasFeatureMask).data.cpu().numpy()    
+        elif(hasSliding_window_shapes!=None):
+            ActualGrad = Grad.attribute(input,sliding_window_shapes=hasSliding_window_shapes, baselines=hasBaseline, target=TestingLabel).data.cpu().numpy()
+        else:
+            ActualGrad = Grad.attribute(input,baselines=hasBaseline).data.cpu().numpy()
+    for t in range(sequence_length):
+        timeGrad[:,t] = np.mean(np.absolute(ActualGrad[0,:,t]))
+    timeContibution=preprocessing.minmax_scale(timeGrad, axis=1)
+    meanTime = np.quantile(timeContibution, .55)        
+    for t in range(sequence_length):
+        print(t)
+        if(timeContibution[0,t]>meanTime):
+            for c in range(input_size):
+                newInput = input.clone()
+                newInput[:,c,t]=assignment
+                if(hasBaseline==None):  
+                    inputGrad_perInput = Grad.attribute(newInput).data.cpu().numpy()
+                else:
+                    if(hasFeatureMask!=None):
+                        inputGrad_perInput = Grad.attribute(newInput,baselines=hasBaseline, target=TestingLabel,feature_mask=hasFeatureMask).data.cpu().numpy()    
+                    elif(hasSliding_window_shapes!=None):
+                        inputGrad_perInput = Grad.attribute(newInput,sliding_window_shapes=hasSliding_window_shapes, baselines=hasBaseline, target=TestingLabel).data.cpu().numpy()
+                    else:
+                        inputGrad_perInput = Grad.attribute(newInput,baselines=hasBaseline).data.cpu().numpy()
+                inputGrad_perInput=np.absolute(ActualGrad - inputGrad_perInput)
+                inputGrad[c,:] = np.sum(inputGrad_perInput)
+            featureContibution= preprocessing.minmax_scale(inputGrad, axis=0)
+        else:
+            featureContibution=np.ones((input_size,1))*0.1
+        for c in range(input_size):
+           newGrad [c,t]= timeContibution[0,t]*featureContibution[c,0]
+    return newGrad
+
+
+
 
 def main_plot(input_file, prefix):
     arrays = np.load(input_file)
