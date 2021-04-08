@@ -51,7 +51,7 @@ def copyFeatures(DataPath, outPath):
     trial_keys = list(trial_keys)
     #for index  in range(0, len(trial_keys)):
     print(trial_keys[:3])
-    for index in tqdm(range(0, 5)):
+    for index in tqdm(range(0, len(trial_keys))):
         print(index)
         trial_key  = trial_keys[index]
         patient_ID,TMS,Type,trial = trial_key[0],trial_key[1],trial_key[2],trial_key[3]
