@@ -57,7 +57,7 @@ def main(model_filename, datafile, resultPath, method="FA"):
 
     for index, (x_data , target) in tqdm(enumerate(dataloader)):
         print(index)
-        saliency_ = processImage(x_data, target, IG, method)
+        saliency_ = processImage(x_data, target, FA, method)
         arrays.append(saliency_)
         np.save(resultPath, arrays)
  

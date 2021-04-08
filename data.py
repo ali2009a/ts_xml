@@ -123,6 +123,31 @@ class HDF5Dataset(Dataset):
                 indices.append(index)
         return indices
 
+def normalizeDataset(dataset_path):
+    d = open_data_file(dataset_path, "r+")
+    means = []
+    stds  = []
+    
+    for index  in tqdm(range(len(d.root.data))):
+        array = d.root.data[index].reshape((3000,100))
+        m = np.mean(array, axis=1)
+        s = np.std(array, axis=1)
+        means.append(m)
+        stds.append(s)
+    
+    mean = np.mean(np.array(means), axis=0)
+    std  = np.std(np.array(stds), axis=0)
+
+    for index  in tqdm(range(len(d.root.data))):
+        array = d.root.data[index].reshape((3000,100))
+        new_array = (array - mean[:, np.newaxis])/ std[:, np.newaxis]
+        d.root.data[index] = new_array.reshape((60,50,100))
+    d.close()
+
+    
+
+
+
 
 def fetch_training_data_files(path="data/original/"):
     training_data_files = list()
