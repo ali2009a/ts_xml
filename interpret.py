@@ -12,6 +12,7 @@ import warnings
 from  sklearn.preprocessing import minmax_scale
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import glob
 warnings.filterwarnings("ignore")
 
 from captum.attr import (
@@ -61,7 +62,7 @@ def main(model_filename, datafile, resultPath, method="FA"):
         arrays.append(saliency_)
         np.save(resultPath, arrays)
  
-def processImage(x_data, target, IG, method):
+def processImage(x_data, target, FA, method):
     labels =  target.to(device)
     input = x_data.to(device)
     input = Variable(input,  volatile=False, requires_grad=True)
@@ -133,22 +134,46 @@ def getTwoStepRescaling(Grad, input, sequence_length,input_size, TestingLabel,ha
 
 
 
-def main_plot(input_file, prefix):
+def main_plot(input_file, output_path, prefix):
     arrays = np.load(input_file)
     aggr = np.mean(arrays, axis=0)
     aggr= aggr.reshape(60,50,100)
     for i in range(6):
-        plot(aggr, i*10,i*10+10, "{}_cluster_{}.png".format(prefix, i))
+        plot(aggr, i*10,i*10+10, "{}/{}_cluster_{}.png".format(output_path, prefix, i))
 
 
-def main_plot_merged(input_file, prefix):
+def main_plot_merged(input_file, output_path, array_path):
     arrays = np.load(input_file)
     aggr = np.mean(arrays, axis=0)
     aggr= aggr.reshape(60,50,100)
     aggr= np.mean(aggr, axis=0)
     plt.imshow(aggr, origin='lower')
-    fileName="{}_merged.png".format(prefix)
-    plt.savefig(fileName)
+    #np.save(array_path, aggr)
+    np.savetxt(array_path, aggr, delimiter=",")
+    #fileName="{}_merged.png".format(prefix)
+    plt.savefig(output_path)
+
+
+def visualizeScores(scores_path, outputPath):
+    for subject_dir in glob.glob(os.path.join(scores_path, "*")):
+        if not os.path.isfile(subject_dir):
+            continue
+        print(subject_dir)
+        parent= os.path.dirname(subject_dir)
+        fileName=os.path.basename(subject_dir)
+        base, extension = os.path.splitext(fileName)
+        main_plot_merged(subject_dir, os.path.join(outputPath,"merged_{}.png".format(base)), os.path.join(outputPath,"merged_{}.csv".format(base)))
+
+def visualizeScores2(scores_path, outputPath):
+    for subject_dir in glob.glob(os.path.join(scores_path, "*")):
+        if not os.path.isfile(subject_dir):
+            continue
+        print(subject_dir)
+        parent= os.path.dirname(subject_dir)
+        fileName=os.path.basename(subject_dir)
+        base, extension = os.path.splitext(fileName)
+        main_plot(subject_dir, outputPath, base)
+
 
 
 def plot(images,s,e, fileName):
