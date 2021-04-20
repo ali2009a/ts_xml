@@ -72,6 +72,7 @@ def main(args):
         training_files, subject_ids = data.fetch_training_data_files(args.features_repo)
         truthData = data.getTruthData(subject_ids, args.labels_repo)
         data.write_data_to_file(training_files, args.data_file, image_shape=[args.NumFeatures, args.NumTimeSteps], subject_ids=subject_ids, truthData=truthData)
+        data.normalizeDataset(args.data_file)
 
     train_loader, val_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, validation_split=0.1, kFold=10, fold=0)
     m = "TCN"
