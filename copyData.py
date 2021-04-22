@@ -25,17 +25,16 @@ def main():
 
 def copyLabels(labelPath, outPath, TEP, COMPONENT, TMS_TYPE):
     df=pd.read_csv(labelPath)
-    df=df[df["TEP"]=="GLOBAL"]
-    df=df[df["COMPONENT"]=="N100"]
+    df=df[df["TEP"]==TEP]
+    df=df[df["COMPONENT"]== COMPONENT]
     df=df[df["TMS_TYPE"]==TMS_TYPE]  #TMS_TYPE could be either SHAM or ACTIVE
     dic={}
     for index, row in df.iterrows():
-        print(index)
         dic[(row["ID"], row["TMS"], row["TRIAL"])] = row["AMPLITUDE"]
     pickle_dump(dic, outPath) 
     
 
-def copyFeatures(DataPath, outPath):
+def copyFeatures(DataPath, outPath, aggr=False):
     trial_keys=set()
     for subject_folder in glob.glob(os.path.join(DataPath, "*")):
         base_name = os.path.basename(subject_folder)
@@ -74,13 +73,45 @@ def copyFeatures(DataPath, outPath):
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-        for elect in electrodes:
-            elec_file = os.path.join(DataPath,"{}_{}_{}_{}_T{}.mat".format(patient_ID,TMS,Type, elect, trial))
-            elec_data = scipy.io.loadmat(elec_file)
-            elec_data = elec_data["HS"]
-            elec_data_reduced = block_reduce(elec_data, block_size=(1,30), func=np.mean, cval=np.mean(elec_data))
-            new_subject_dir = os.path.join(folder_path, "{}".format(elect))
+        if aggr==False:
+            for elect in electrodes:
+                elec_file = os.path.join(DataPath,"{}_{}_{}_{}_T{}.mat".format(patient_ID,TMS,Type, elect, trial))
+                elec_data = scipy.io.loadmat(elec_file)
+                elec_data = elec_data["HS"]
+                elec_data_reduced = block_reduce(elec_data[:,2000:], block_size=(1,10), func=np.mean, cval=np.mean(elec_data[:,2000:]))
+                new_subject_dir = os.path.join(folder_path, "{}".format(elect))
+                np.save(new_subject_dir, elec_data_reduced, allow_pickle=False)
+        else:
+            region_electrodes = region2elec(TMS)
+            region_elecs = []
+            for elect in region_electrodes:
+                elec_file = os.path.join(DataPath,"{}_{}_{}_{}_T{}.mat".format(patient_ID,TMS,Type, elect, trial))
+                elec_data = scipy.io.loadmat(elec_file)
+                elec_data = elec_data["HS"]
+                elec_data_reduced = block_reduce(elec_data[:,2000:], block_size=(1,10), func=np.mean, cval=np.mean(elec_data[:,2000:]))
+                region_elecs.append(elec_data_reduced)
+            region_aggr = np.mean(region_elecs, axis=0)
+            new_subject_dir = os.path.join(folder_path, "{}".format("aggr"))
             np.save(new_subject_dir, elec_data_reduced, allow_pickle=False)
+
+
+def region2elec(region):
+    print("region:"+region)
+    if region[-1].isnumeric():
+        region = region[:-1]
+    if region=="LPFC":
+        elec = ["F1", "F3", "F5", "F7", "FC1", "FC3", "FC5", "FT7"]
+    if region=="RPFC":
+        elec = ["F2", "F4", "F6", "F8", "FC2", "FC4", "FC6", "FT8"]
+    if region=="LMC":
+        elec = ["C1", "C3", "C5", "T7", "CP1", "CP3", "CP5", "TP7"]
+    if region=="RMC":
+        elec = ["C2", "C4", "C6", "T8", "CP2", "CP4", "CP6", "TP8"]
+    if region=="LPC":
+        elec = ["P1", "P3", "P5", "P7", "PO3", "PO5", "PO7", "O1"]
+    if region=="RMC":
+        elec = ["P2", "P4", "P6", "P8", "PO4", "PO6", "PO8", "O2"]
+    return elec
 
 def saveFiles(relevant_files, new_subject_dir):        
         arr = np.empty((0,100))

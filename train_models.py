@@ -24,7 +24,7 @@ def createDataFile(args):
     print("creating file...")
     if not os.path.exists(args.data_file) or True:
         print("Writing the images to h5 file...")
-        training_files, subject_ids = data.fetch_training_data_files(args.features_repo)
+        training_files, subject_ids = data.fetch_training_data_files(args.features_repo, aggr=args.aggr)
         truthData = data.getTruthData(subject_ids, args.labels_repo)
         data.write_data_to_file(training_files, args.data_file, image_shape=[args.NumFeatures, args.NumTimeSteps], subject_ids=subject_ids, truthData=truthData)
 
@@ -32,10 +32,10 @@ def trainFold(args, k, train_loader, val_loader, test_loader):
     print("k:{}".format(k))
     m = "TCN"
     channel_sizes = [args.nhid] * args.levels
-    model = TCN(3000, args.n_classes, channel_sizes, kernel_size=args.ksize, dropout=args.dropout)
-    summary(model, (3000,100))
+    model = TCN(args.NumElecs*args.NumFeatures, args.n_classes, channel_sizes, kernel_size=args.ksize, dropout=args.dropout)
+    summary(model, (args.NumElecs*args.NumFeatures, args.NumTimeSteps))
     model.to(device)
-    model_name = "k_{}_model_{}_NumFeatures_{}".format(k, m, args.NumFeatures*60)
+    model_name = "k_{}_model_{}_NumFeatures_{}".format(k, m, args.NumFeatures*args.NumElecs)
     model_filename = args.model_dir + 'm_' + model_name + '.pt'
     lr=args.lr
     optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
@@ -69,16 +69,17 @@ def main(args):
     torch.manual_seed(args.seed)
     if not os.path.exists(args.data_file):
         print("Writing the images to h5 file...")
-        training_files, subject_ids = data.fetch_training_data_files(args.features_repo)
+        training_files, subject_ids = data.fetch_training_data_files(args.features_repo, args.aggr)
         truthData = data.getTruthData(subject_ids, args.labels_repo)
-        data.write_data_to_file(training_files, args.data_file, image_shape=[args.NumFeatures, args.NumTimeSteps], subject_ids=subject_ids, truthData=truthData)
-        data.normalizeDataset(args.data_file)
-
-    train_loader, val_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, validation_split=0.1, kFold=10, fold=0)
+        data.write_data_to_file(training_files, args.data_file, image_shape=[args.NumFeatures, args.NumTimeSteps], subject_ids=subject_ids, truthData=truthData, n_channels = args.NumElecs)
+        data.normalizeDataset(args.data_file, args.NumFeatures, args.NumElecs, args.NumTimeSteps)
+    
+    
+    train_loader, val_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, validation_split=0.1, kFold=10, fold=0, allowShare=True, shuffle=True)
     m = "TCN"
     channel_sizes = [args.nhid] * args.levels
-    model = TCN(3000, args.n_classes, channel_sizes, kernel_size=args.ksize, dropout=args.dropout)
-    summary(model, (3000,100))
+    model = TCN(args.NumElecs*args.NumFeatures, args.n_classes, channel_sizes, kernel_size=args.ksize, dropout=args.dropout)
+    summary(model, (args.NumElecs*args.NumFeatures, args.NumTimeSteps))
     model.to(device)
     #model_name = "model_{}_NumFeatures_{}".format(m,args.NumFeatures*60)
     #model_filename = args.model_dir + 'm_' + model_name + '.pt'
@@ -111,14 +112,12 @@ def save(model, save_filename):
 
 
 def train(args,ep,model,train_loader,optimizer):
-
     train_loss = 0
     model.train()
     print("Number of batches: {}".format(len(train_loader)))
     for batch_idx, (data, target) in tqdm(enumerate(train_loader)):
         data, target = data.to(device), target.to(device)
-
-        data = data.view(-1, 3000, args.NumTimeSteps)
+        data = data.view(-1, args.NumElecs*args.NumFeatures, args.NumTimeSteps)
         data, target = Variable(data), Variable(target)
         optimizer.zero_grad()
         output = model(data)
@@ -137,7 +136,6 @@ def train(args,ep,model,train_loader,optimizer):
     return model, optimizer
 
 
-
 def test(args,model,test_loader):
     model.eval()
     test_loss = 0
@@ -149,7 +147,7 @@ def test(args,model,test_loader):
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
 
-            data = data.view(-1, 3000, args.NumTimeSteps)
+            data = data.view(-1, args.NumElecs*args.NumFeatures, args.NumTimeSteps)
             data, target = Variable(data, volatile=True), Variable(target)
             output = model(data)
             test_loss += F.smooth_l1_loss(output, target, size_average=False).item()
@@ -170,8 +168,8 @@ def parse_arguments(raw_args):
     parser = argparse.ArgumentParser()
 
 
-    parser.add_argument('--batch_size', type=int, default=64, metavar='N',
-                        help='batch size (default: 64)')
+    parser.add_argument('--batch_size', type=int, default=32, metavar='N',
+                        help='batch size (default: 32)')
     parser.add_argument('--cuda', action='store_false',
                         help='use CUDA (default: True)')
     parser.add_argument('--dropout', type=float, default=0.05,
@@ -186,8 +184,8 @@ def parse_arguments(raw_args):
 
     parser.add_argument('--levels', type=int, default=8,
                         help='# of levels (default: 8)')
-    parser.add_argument('--log-interval', type=int, default=100, metavar='N',
-                        help='report interval (default: 100')
+    parser.add_argument('--log-interval', type=int, default=1, metavar='N',
+                        help='report interval (default: 1')
     parser.add_argument('--lr', type=float, default=2e-3,
                         help='initial learning rate (default: 2e-3)')
     parser.add_argument('--optim', type=str, default='Adam',
@@ -206,6 +204,7 @@ def parse_arguments(raw_args):
 
     parser.add_argument('--NumTimeSteps',type=int,default=100)
     parser.add_argument('--NumFeatures',type=int,default=50)
+    parser.add_argument('--NumElecs',type=int,default=60)
 
     parser.add_argument('--n_layers', type=int, default=60)
     parser.add_argument('--heads', type=int, default=4)
@@ -219,6 +218,7 @@ def parse_arguments(raw_args):
 
     parser.add_argument("--writeOnly", action='store_true')
     parser.add_argument("--sham", action='store_true')
+    parser.add_argument("--aggr", action='store_true')
     return  parser.parse_args(raw_args)
 
 if __name__ == '__main__':
@@ -228,6 +228,8 @@ if __name__ == '__main__':
 
 def main_train(raw_args):
     args = parse_arguments(raw_args)
+    print("args.aggr:")
+    print(args.aggr)
     main(args) 
 
     

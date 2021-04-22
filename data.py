@@ -84,14 +84,16 @@ class HDF5Dataset(Dataset):
 
     def __init__(self, h5_path):
         self.h5_path = '/Users/teff/Downloads/'
+        self.h5_path = h5_path
         self.data_handler =  open_data_file(h5_path)
         self.length = len(self.data_handler.root.data)
 
     def __getitem__(self, index): #to enable indexing
         x, y = self.data_handler.root.data[index], np.array([self.data_handler.root.truth[index]])
         #x, y = self.data_handler.root.data[index], self.data_handler.root.truth[index]
+        n_channels, NumFeatures, NumTimeSteps = x.shape[0], x.shape[1], x.shape[2]
         return (
-                x.reshape(3000, 100),
+                x.reshape(n_channels*NumFeatures, NumTimeSteps),
                 (y*1000*1000).astype('float32')
         )
 
@@ -123,13 +125,13 @@ class HDF5Dataset(Dataset):
                 indices.append(index)
         return indices
 
-def normalizeDataset(dataset_path):
+def normalizeDataset(dataset_path, NumFeatures, n_channels, NumTimeSteps=100):
     d = open_data_file(dataset_path, "r+")
     means = []
     stds  = []
     
     for index  in tqdm(range(len(d.root.data))):
-        array = d.root.data[index].reshape((3000,100))
+        array = d.root.data[index].reshape((NumFeatures*n_channels, NumTimeSteps))
         m = np.mean(array, axis=1)
         s = np.std(array, axis=1)
         means.append(m)
@@ -139,9 +141,9 @@ def normalizeDataset(dataset_path):
     std  = np.std(np.array(stds), axis=0)
 
     for index  in tqdm(range(len(d.root.data))):
-        array = d.root.data[index].reshape((3000,100))
+        array = d.root.data[index].reshape((NumFeatures*n_channels, NumTimeSteps))
         new_array = (array - mean[:, np.newaxis])/ std[:, np.newaxis]
-        d.root.data[index] = new_array.reshape((60,50,100))
+        d.root.data[index] = new_array.reshape((n_channels, NumFeatures, NumTimeSteps))
     d.close()
 
     
@@ -149,7 +151,7 @@ def normalizeDataset(dataset_path):
 
 
 
-def fetch_training_data_files(path="data/original/"):
+def fetch_training_data_files(path="data/original/", aggr=False):
     training_data_files = list()
     subject_ids = list()
     for subject_dir in glob.glob(os.path.join(path, "*")):
@@ -159,18 +161,20 @@ def fetch_training_data_files(path="data/original/"):
             continue
         subject_ids.append(os.path.basename(subject_dir))
         subject_files = list()
-        for modality in electrodes:
-            subject_files.append(os.path.join(subject_dir, modality+ ".npy"))
+        if aggr==False:
+            for modality in electrodes:
+                subject_files.append(os.path.join(subject_dir, modality+ ".npy"))
+        else:
+            subject_files.append(os.path.join(subject_dir, "aggr"+ ".npy"))
         training_data_files.append(tuple(subject_files))
     #print(training_data_files)
     return training_data_files, subject_ids
-
 
 def getTruthData(subject_ids, labelPath):
     truthData = pickle_load(labelPath) 
     labels = []
     for subj in subject_ids:
-        print(subj)
+        #print(subj)
         tokens = subj.split("_")
         patient_id = tokens[0]
         TMS= tokens[1]
@@ -184,10 +188,9 @@ def getTruthData(subject_ids, labelPath):
             labels.append(truthData[key])
     return labels
         
-
-def write_data_to_file(training_data_files, out_file, image_shape, subject_ids, truthData, normalize=True):
+def write_data_to_file(training_data_files, out_file, image_shape, subject_ids, truthData, normalize=True, n_channels = 60):
     n_samples = len(training_data_files)
-    n_channels = 60
+    #n_channels = 60
 
     try:
         hdf5_file, data_storage  = create_data_file(out_file,
@@ -248,7 +251,6 @@ def add_data_to_storage(data_storage, subject_data):
 
 def load_files(in_files):
     data_list=[]
-    print(len(in_files))
     for f in in_files:
         data=np.load(f, allow_pickle=False)
         data_list.append(data)
@@ -272,9 +274,8 @@ def reslice_image_set(in_files, image_shape):
     resized_lbl = nib.Nifti1Image(new_lbl_matrix, data_dict["label_meta_dict"]["affine"])
     return ([resized_img, resized_lbl], original_image_size)
     #return None
+
 """
-
-
 def open_data_file(filename, readwrite="r"):
     return tables.open_file(filename, readwrite)
 
@@ -287,7 +288,9 @@ def pickle_load(in_file):
     with open(in_file, "rb") as opened_file:
         return pickle.load(opened_file)
 
+
 """
+
 #original is located in prediction
 def resize_to_original_size(image, original_size):
     original_size = [int(dim) for dim in original_size]

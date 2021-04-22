@@ -32,12 +32,13 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def givenAttGetRescaledSaliency(args,attributions,isTensor=True):
+    NumElecs_NumFeatures, NumTimeSteps = attributions.shape[1], attributions.shape[2]
     if(isTensor):
         saliency = np.absolute(attributions.data.cpu().numpy())
     else:
         saliency = np.absolute(attributions)
     #saliency=saliency.reshape(-1,args.NumTimeSteps*args.NumFeatures)
-    saliency=saliency.reshape(-1, 3000*100)
+    saliency=saliency.reshape(-1, NumElecs_NumFeatures*NumTimeSteps)
     rescaledSaliency=minmax_scale(saliency,axis=1)
     rescaledSaliency=rescaledSaliency.reshape(attributions.shape)
     return rescaledSaliency
@@ -47,8 +48,11 @@ def main(model_filename, datafile, resultPath, method="FA"):
     #model_filename ="../Models/m_k_0_model_TCN_NumFeatures_3000.pt"
     pretrained_model = torch.load(open(model_filename, "rb"),map_location=device)
     pretrained_model.to(device)    
-    dataset = data.HDF5Dataset(datafile)
-    dataloader = data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0) 
+    #dataset = data.HDF5Dataset(datafile)
+    #dataloader = data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0) 
+
+    train_loader, val_loader, test_loader = data.generator(datafile, batch_size=1, validation_split=0.1, kFold=10, fold=0, allowShare=True, shuffle=True)
+
     arrays = []
     FA = FeatureAblation(pretrained_model)
     Grad = Saliency(pretrained_model)
@@ -56,17 +60,19 @@ def main(model_filename, datafile, resultPath, method="FA"):
     SG = NoiseTunnel(Grad_)
     IG = IntegratedGradients(pretrained_model)
 
-    for index, (x_data , target) in tqdm(enumerate(dataloader)):
+    for index, (x_data , target) in tqdm(enumerate(train_loader)):
         print(index)
         saliency_ = processImage(x_data, target, FA, method)
         arrays.append(saliency_)
         np.save(resultPath, arrays)
  
 def processImage(x_data, target, FA, method):
+    print(x_data.shape)
+    NumElecs_by_NumFeatures, NumTimeSteps = x_data.shape[1], x_data.shape[2]
     labels =  target.to(device)
     input = x_data.to(device)
     input = Variable(input,  volatile=False, requires_grad=True)
-    Data= x_data.reshape(3000, 100).data.cpu().numpy()
+    Data= x_data.reshape(NumElecs_by_NumFeatures, NumTimeSteps).data.cpu().numpy()
     target_=target.data.cpu().numpy()[0]
     args=""
     baseline_single=torch.Tensor(np.random.random(input.shape)).to(device)
@@ -84,7 +90,7 @@ def processImage(x_data, target, FA, method):
     if method=="IG":
         #attributions = IG.attribute(input, baselines=baseline_single)
         #saliency_= givenAttGetRescaledSaliency(args,attributions)
-        TSR_attributions =getTwoStepRescaling(IG, input, 100, 3000, labels,hasBaseline=baseline_single)
+        TSR_attributions =getTwoStepRescaling(IG, input, NumTimeSteps, NumElecs_by_NumFeatures, labels,hasBaseline=baseline_single)
         saliency_= givenAttGetRescaledSaliency(args, TSR_attributions, isTensor=False)
     return saliency_
 
@@ -134,18 +140,20 @@ def getTwoStepRescaling(Grad, input, sequence_length,input_size, TestingLabel,ha
 
 
 
-def main_plot(input_file, output_path, prefix):
+def main_plot(input_file, output_path, prefix, NumElecs=1, NumFeatures=50, NumTimeSteps=100):
     arrays = np.load(input_file)
+    #NumElecs, NumFeatures, NumTimeSteps = arrays.shape[1], arrays.shape[2], arrays.shape[3]
     aggr = np.mean(arrays, axis=0)
-    aggr= aggr.reshape(60,50,100)
+    aggr= aggr.reshape(NumElecs, NumFeatures, NumTimeSteps)
     for i in range(6):
         plot(aggr, i*10,i*10+10, "{}/{}_cluster_{}.png".format(output_path, prefix, i))
 
 
-def main_plot_merged(input_file, output_path, array_path):
+def main_plot_merged(input_file, output_path, array_path, NumElecs=1, NumFeatures=50, NumTimeSteps=100):
     arrays = np.load(input_file)
+    #NumElecs, NumFeatures, NumTimeSteps = arrays.shape[1], arrays.shape[2], arrays.shape[3]
     aggr = np.mean(arrays, axis=0)
-    aggr= aggr.reshape(60,50,100)
+    aggr= aggr.reshape(NumElecs, NumFeatures, NumTimeSteps)
     aggr= np.mean(aggr, axis=0)
     plt.imshow(aggr, origin='lower')
     #np.save(array_path, aggr)
@@ -193,8 +201,10 @@ def plotSamples(fileName, output_file):
     i=0
     for index, (x_data , target) in tqdm(enumerate(dataloader)):
         if index in indices:
-            Data= x_data.reshape(3000, 100).data.cpu().numpy()
-            Data= Data.reshape(60,50,100)
+            NumElecs, NumFeatures, NumTimeSteps = x_data.shape[1], x_data.shape[2], x_data.shape[3]
+
+            Data= x_data.reshape(NumElecs*NumFeatures, NumTimeSteps).data.cpu().numpy()
+            Data= Data.reshape(NumElecs, NumFeatures, NumTimeSteps)
             ax[i].imshow(Data[0,:,:], origin='lower') 
             i=i+1
     plt.savefig(output_file)    
