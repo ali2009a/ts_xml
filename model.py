@@ -91,3 +91,30 @@ class TCN(nn.Module):
         o = self.relu(lo)
         # return F.log_softmax(o, dim=1) #original
         return o
+
+
+class LSTM(nn.Module):
+    def __init__(self, input_size, hidden_size ,num_classes , rnndropout):
+        super().__init__()
+        self.hidden_size = hidden_size
+
+        self.drop = nn.Dropout(rnndropout)
+        self.fc = nn.Linear(hidden_size, num_classes) 
+        self.rnn = nn.LSTM(input_size,hidden_size,batch_first=True)
+        self.relu = nn.LeakyReLU()
+
+
+    def forward(self, x):
+        x= x.transpose(1, 2)
+        # Set initial states
+        h0 = torch.zeros(1, x.size(0), self.hidden_size).to(device) 
+        c0 = torch.zeros(1, x.size(0), self.hidden_size).to(device)
+        x = self.drop(x)
+        output, _ = self.rnn(x, (h0, c0))
+        output = self.drop(output)
+        output=output[:,-1,:]
+        out = self.fc(output)
+        return  self.relu(out)
+        #return F.log_softmax(out, dim=1)        
+
+ 

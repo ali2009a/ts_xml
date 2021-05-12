@@ -38,7 +38,7 @@ config["training_repo"] = "data/original"
 def main(overwrite=False, training_repo="data/original", logging_file="training.log"):
     
     # convert input images into an hdf5 file
-    if not os.path.exists(config["data_file"]) or True:
+    if not os.path.exists(config["data_file"]):
         print("Writing the images to h5 file...")
         training_files, subject_ids = data.fetch_training_data_files(training_repo)
         print("subject ids:")
@@ -46,7 +46,8 @@ def main(overwrite=False, training_repo="data/original", logging_file="training.
         truthData = data.getTruthData(subject_ids, config["truthData"])
         print(training_files[:2])
         data.write_data_to_file(training_files, config["data_file"], image_shape=config["image_shape"], subject_ids=subject_ids, truthData=truthData)
-
+    else:
+        print("data file already exists. Loading...")
 
 
 #    data_file_opened = data.open_data_file(config["data_file"])

@@ -34,7 +34,7 @@ def copyLabels(labelPath, outPath, TEP, COMPONENT, TMS_TYPE):
     pickle_dump(dic, outPath) 
     
 
-def copyFeatures(DataPath, outPath, aggr=False):
+def copyFeatures(DataPath, outPath, aggr=False, strip=False):
     trial_keys=set()
     for subject_folder in glob.glob(os.path.join(DataPath, "*")):
         base_name = os.path.basename(subject_folder)
@@ -78,7 +78,10 @@ def copyFeatures(DataPath, outPath, aggr=False):
                 elec_file = os.path.join(DataPath,"{}_{}_{}_{}_T{}.mat".format(patient_ID,TMS,Type, elect, trial))
                 elec_data = scipy.io.loadmat(elec_file)
                 elec_data = elec_data["HS"]
-                elec_data_reduced = block_reduce(elec_data[:,2000:], block_size=(1,10), func=np.mean, cval=np.mean(elec_data[:,2000:]))
+                if strip==False:
+                    elec_data_reduced = block_reduce(elec_data[:,2000:], block_size=(1,10), func=np.mean, cval=np.mean(elec_data[:,2000:]))
+                else:
+                    elec_data_reduced = block_reduce(elec_data[:,2000-5:-5], block_size=(1,10), func=np.mean, cval=np.mean(elec_data[:,2000-5:-5]))
                 new_subject_dir = os.path.join(folder_path, "{}".format(elect))
                 np.save(new_subject_dir, elec_data_reduced, allow_pickle=False)
         else:
@@ -109,7 +112,7 @@ def region2elec(region):
         elec = ["C2", "C4", "C6", "T8", "CP2", "CP4", "CP6", "TP8"]
     if region=="LPC":
         elec = ["P1", "P3", "P5", "P7", "PO3", "PO5", "PO7", "O1"]
-    if region=="RMC":
+    if region=="RPC":
         elec = ["P2", "P4", "P6", "P8", "PO4", "PO6", "PO8", "O2"]
     return elec
 

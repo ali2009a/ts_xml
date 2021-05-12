@@ -3,7 +3,7 @@ from torch.autograd import Variable
 import torch.optim as optim
 import torch.nn.functional as F
 import sys, os
-from model import TCN
+from model import TCN, LSTM, Transformer, LSTMWithInputCellAttention
 import numpy as np
 import argparse
 from tqdm import tqdm
@@ -73,13 +73,21 @@ def main(args):
         truthData = data.getTruthData(subject_ids, args.labels_repo)
         data.write_data_to_file(training_files, args.data_file, image_shape=[args.NumFeatures, args.NumTimeSteps], subject_ids=subject_ids, truthData=truthData, n_channels = args.NumElecs)
         data.normalizeDataset(args.data_file, args.NumFeatures, args.NumElecs, args.NumTimeSteps)
-    
+    else:
+        print("data file exists. Loading existing one...")
     
     train_loader, val_loader, test_loader = data.generator(args.data_file, batch_size=args.batch_size, validation_split=0.1, kFold=10, fold=0, allowShare=True, shuffle=True)
     m = "TCN"
     channel_sizes = [args.nhid] * args.levels
-    model = TCN(args.NumElecs*args.NumFeatures, args.n_classes, channel_sizes, kernel_size=args.ksize, dropout=args.dropout)
-    summary(model, (args.NumElecs*args.NumFeatures, args.NumTimeSteps))
+    if args.model == "TCN":
+        print("using TCN model")
+        model = TCN(args.NumElecs*args.NumFeatures, args.n_classes, channel_sizes, kernel_size=args.ksize, dropout=args.dropout)
+    elif args.model == "LSTM":
+        print("using LSTM model")
+        model = LSTM(args.NumElecs*args.NumFeatures,  args.nhid, args.n_classes,args.dropout)
+    else:
+        print("invalid model!")
+    #summary(model, (args.NumElecs*args.NumFeatures, args.NumTimeSteps))
     model.to(device)
     #model_name = "model_{}_NumFeatures_{}".format(m,args.NumFeatures*60)
     #model_filename = args.model_dir + 'm_' + model_name + '.pt'
@@ -89,6 +97,8 @@ def main(args):
 
     best_test_loss=100
     #best_test_acc = -1
+    test_loss,test_acc = test(args,model,val_loader)
+    print("random stats: loss:{}, ev: {}".format(test_loss, test_acc))
     for epoch in range(1, args.epochs+1):
         print("epoch: {}".format(epoch))
         model,optimizer = train(args,epoch,model,train_loader,optimizer)
@@ -159,7 +169,7 @@ def test(args,model,test_loader):
         total_targets = total_targets.reshape((-1))
         total_predictions = total_predictions.reshape((-1))
         Acc = metrics.explained_variance_score(total_targets, total_predictions)
-        message = ('\nTest set: Average loss: {:.10f}, accuracy: {})\n'.format(
+        message = ('\nValidation Set: Average loss: {:.10f}, ev: {})\n'.format(
             test_loss, Acc))
         print(message)
         return test_loss,Acc
@@ -184,7 +194,7 @@ def parse_arguments(raw_args):
 
     parser.add_argument('--levels', type=int, default=8,
                         help='# of levels (default: 8)')
-    parser.add_argument('--log-interval', type=int, default=1, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=10000, metavar='N',
                         help='report interval (default: 1')
     parser.add_argument('--lr', type=float, default=2e-3,
                         help='initial learning rate (default: 2e-3)')
@@ -219,6 +229,7 @@ def parse_arguments(raw_args):
     parser.add_argument("--writeOnly", action='store_true')
     parser.add_argument("--sham", action='store_true')
     parser.add_argument("--aggr", action='store_true')
+    parser.add_argument('--model', type=str, default="TCN")
     return  parser.parse_args(raw_args)
 
 if __name__ == '__main__':

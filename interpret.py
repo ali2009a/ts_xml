@@ -54,19 +54,22 @@ def main(model_filename, datafile, resultPath, method="FA"):
     train_loader, val_loader, test_loader = data.generator(datafile, batch_size=1, validation_split=0.1, kFold=10, fold=0, allowShare=True, shuffle=True)
 
     arrays = []
-    FA = FeatureAblation(pretrained_model)
-    Grad = Saliency(pretrained_model)
-    Grad_ = Saliency(pretrained_model)
-    SG = NoiseTunnel(Grad_)
-    IG = IntegratedGradients(pretrained_model)
+    if method  == "FA":
+        interpreter = FeatureAblation(pretrained_model)
+    elif method ="GRAD":
+        interpreter = Saliency(pretrained_model)
+    elif method="IG":
+        interpreter = IntegratedGradients(pretrained_model)
+    elif method== "TSR":
+        interpret = None
 
     for index, (x_data , target) in tqdm(enumerate(train_loader)):
         print(index)
-        saliency_ = processImage(x_data, target, FA, method)
+        saliency_ = processImage(x_data, target, interpreter, method)
         arrays.append(saliency_)
         np.save(resultPath, arrays)
  
-def processImage(x_data, target, FA, method):
+def processImage(x_data, target, interpreter, method):
     print(x_data.shape)
     NumElecs_by_NumFeatures, NumTimeSteps = x_data.shape[1], x_data.shape[2]
     labels =  target.to(device)
@@ -76,22 +79,22 @@ def processImage(x_data, target, FA, method):
     target_=target.data.cpu().numpy()[0]
     args=""
     baseline_single=torch.Tensor(np.random.random(input.shape)).to(device)
-    
+
     #attributions = Grad.attribute(input)
     #saliency_= givenAttGetRescaledSaliency(args,attributions)    
 
-    if method=="FA":
-        attributions = FA.attribute(input)
-        saliency_= givenAttGetRescaledSaliency(args,attributions)
-
-    #attributions = SG.attribute(input)        
-    #saliency_= givenAttGetRescaledSaliency(args,attributions)
-
-    if method=="IG":
-        #attributions = IG.attribute(input, baselines=baseline_single)
-        #saliency_= givenAttGetRescaledSaliency(args,attributions)
+    if method ="TSR":
         TSR_attributions =getTwoStepRescaling(IG, input, NumTimeSteps, NumElecs_by_NumFeatures, labels,hasBaseline=baseline_single)
         saliency_= givenAttGetRescaledSaliency(args, TSR_attributions, isTensor=False)
+        return saliency_
+
+    if method=="FA":
+        attributions = interpreter.attribute(input)
+        saliency_= givenAttGetRescaledSaliency(args,attributions)
+
+    if method=="IG":
+        attributions = interpreter.attribute(input, baselines=baseline_single)
+        saliency_= givenAttGetRescaledSaliency(args,attributions)
     return saliency_
 
 
